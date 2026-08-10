@@ -1,0 +1,40 @@
+{
+  "Navbar": {
+    "title": "Activity Calendar & Teaching Attendance",
+    "subtitle": "College of Hospitality Industry Management (CHM)",
+    "adminDuty": "Duty Travel: Phitchapha Lolasakul",
+    "adminTeaching": "Teaching Calendar: Ratchatasorn Jantrawarasit",
+    "login": "Admin Login",
+    "logout": "Logout"
+  },
+  "Calendar": {
+    "title": "Activity Schedule",
+    "prev": "Previous",
+    "today": "Today",
+    "next": "Next",
+    "addActivity": "Add Activity",
+    "empty": "No events today"
+  },
+  "Form": {
+    "title": "Add New Entry",
+    "subtitle": "NEW ENTRY",
+    "type": "Category",
+    "dutyTravel": "Duty Travel / Activity",
+    "teachingCheck": "Teaching Attendance Check",
+    "startDate": "Start Date",
+    "endDate": "End Date (if multi-day)",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "participants": "Participants (comma-separated)",
+    "participantsPlaceholder": "e.g., John, Jane, Hu",
+    "details": "Activity Details",
+    "detailsPlaceholder": "Details of duty travel or course instruction",
+    "status": "Status",
+    "confirmed": "Confirmed",
+    "pending": "Pending Order",
+    "attachment": "Attachment (Max 8MB per file — Stored on Google Drive)",
+    "attachmentPlaceholder": "Click to select document (Duty travel order, certificate, etc.)",
+    "save": "Save",
+    "cancel": "Cancel"
+  }
+}
