@@ -351,6 +351,16 @@ export default function HomePage() {
   const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Hover Tooltip State
+  const [hoveredCell, setHoveredCell] = React.useState<CalendarCell | null>(null);
+  const [tooltipPosition, setTooltipPosition] = React.useState<{
+    x: number;
+    y: number;
+    height: number;
+    topRow: boolean;
+    colIndex: number;
+  } | null>(null);
+
   const handlePrevMonth = () => {
     setCurrentDate(prev => {
       const newDate = new Date(prev);
@@ -369,6 +379,105 @@ export default function HomePage() {
 
   const handleGoToToday = () => {
     setCurrentDate(new Date(2026, 7, 10)); // August 10, 2026
+  };
+
+  // Helper for holidays lookup
+  const getHoliday = (dateStr: string) => {
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return null;
+    const mmdd = `${parts[1]}-${parts[2]}`;
+    
+    const holidays: Record<string, { nameTh: string; nameEn: string; lunarTh?: string }> = {
+      '01-01': { nameTh: 'วันขึ้นปีใหม่', nameEn: 'New Year\'s Day' },
+      '04-06': { nameTh: 'วันจักรี', nameEn: 'Chakri Memorial Day' },
+      '04-13': { nameTh: 'วันสงกรานต์', nameEn: 'Songkran Festival' },
+      '04-14': { nameTh: 'วันสงกรานต์', nameEn: 'Songkran Festival' },
+      '04-15': { nameTh: 'วันสงกรานต์', nameEn: 'Songkran Festival' },
+      '05-01': { nameTh: 'วันแรงงานแห่งชาติ', nameEn: 'National Labour Day' },
+      '05-04': { nameTh: 'วันฉัตรมงคล', nameEn: 'Coronation Day' },
+      '06-03': { nameTh: 'วันเฉลิมพระชนมพรรษา สมเด็จพระนางเจ้าสุทิดาฯ พระบรมราชินี', nameEn: 'H.M. Queen Suthida\'s Birthday' },
+      '07-28': { nameTh: 'วันเฉลิมพระชนมพรรษา พระบาทสมเด็จพระเจ้าอยู่หัว', nameEn: 'H.M. King Maha Vajiralongkorn\'s Birthday' },
+      '08-12': { nameTh: 'วันเฉลิมพระชนมพรรษา สมเด็จพระบรมราชชนนีพันปีหลวง / วันแม่แห่งชาติ', nameEn: 'H.M. Queen Sirikit\'s Birthday / Mother\'s Day', lunarTh: 'วันแรม 14 ค่ำ เดือน 88' },
+      '10-13': { nameTh: 'วันคล้ายวันสวรรคต รัชกาลที่ 9', nameEn: 'King Bhumibol Memorial Day' },
+      '10-23': { nameTh: 'วันปิยมหาราช', nameEn: 'Chulalongkorn Day' },
+      '12-05': { nameTh: 'วันคล้ายวันพระบรมราชสมภพ รัชกาลที่ 9 / วันพ่อแห่งชาติ', nameEn: 'King Bhumibol\'s Birthday / Father\'s Day' },
+      '12-10': { nameTh: 'วันรัฐธรรมนูญ', nameEn: 'Constitution Day' },
+      '12-31': { nameTh: 'วันสิ้นปี', nameEn: 'New Year\'s Eve' }
+    };
+    
+    return holidays[mmdd] || null;
+  };
+
+  // Helper for Thai lunar date calculation (August 2026 spec)
+  const getThaiLunarDate = (dateStr: string): string | null => {
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return null;
+    const yearNum = parseInt(parts[0]);
+    const monthNum = parseInt(parts[1]) - 1; // 0-indexed
+    const dayNum = parseInt(parts[2]);
+    
+    if (yearNum === 2026 && monthNum === 7) {
+      if (dayNum <= 13) {
+        return `วันแรม ${dayNum + 2} ค่ำ เดือน 88`;
+      } else if (dayNum >= 14 && dayNum <= 27) {
+        return `วันขึ้น ${dayNum - 13} ค่ำ เดือน 9`;
+      } else if (dayNum === 28) {
+        return `วันขึ้น 15 ค่ำ เดือน 9`;
+      } else {
+        return `วันแรม ${dayNum - 28} ค่ำ เดือน 9`;
+      }
+    }
+    
+    return null;
+  };
+
+  const getTooltipDateTitle = (dateStr: string) => {
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return '';
+    const day = parseInt(parts[2]);
+    const monthIndex = parseInt(parts[1]) - 1;
+    const yearBE = parseInt(parts[0]) + 543;
+    const yearAD = parseInt(parts[0]);
+    
+    const monthsTh = [
+      'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+      'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+    ];
+    const monthsEn = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    if (locale === 'th') {
+      return `${day} ${monthsTh[monthIndex]} ${yearBE}`;
+    }
+    return `${monthsEn[monthIndex]} ${day}, ${yearAD}`;
+  };
+
+  // Hover Tooltip Handlers
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>, cell: CalendarCell, idx: number) => {
+    const dayEvents = events.filter(ev => ev.date === cell.dateString);
+    const holiday = getHoliday(cell.dateString);
+    
+    if (dayEvents.length === 0 && !holiday) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const rowIndex = Math.floor(idx / 7);
+    const colIndex = idx % 7;
+    
+    setHoveredCell(cell);
+    setTooltipPosition({
+      x: rect.left + window.scrollX + rect.width / 2,
+      y: rect.top + window.scrollY,
+      height: rect.height,
+      topRow: rowIndex < 3,
+      colIndex
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredCell(null);
+    setTooltipPosition(null);
   };
 
   // Upload Area Trigger File Click
@@ -805,7 +914,9 @@ export default function HomePage() {
                 <div 
                   key={`cell-${idx}`} 
                   onClick={() => handleCellClick(cell)}
-                  className={`min-h-[100px] p-2 rounded-xl border transition-all flex flex-col gap-1.5 cursor-pointer
+                  onMouseEnter={(e) => handleMouseEnter(e, cell, idx)}
+                  onMouseLeave={handleMouseLeave}
+                  className={`min-h-[100px] p-2 rounded-xl border transition-all flex flex-col gap-1.5 cursor-pointer relative
                     ${!cell.isCurrentMonth 
                       ? 'bg-slate-50/20 dark:bg-slate-900/5 border-slate-100/50 dark:border-slate-800/40 opacity-30' 
                       : 'bg-white dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 hover:border-primary/50'
@@ -855,6 +966,101 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Hover Detail Tooltip */}
+      {hoveredCell && tooltipPosition && (
+        <div 
+          style={{
+            position: 'absolute',
+            left: `${tooltipPosition.x}px`,
+            top: tooltipPosition.topRow 
+              ? `${tooltipPosition.y + tooltipPosition.height}px` 
+              : `${tooltipPosition.y}px`,
+            transform: tooltipPosition.topRow
+              ? (tooltipPosition.colIndex === 0 
+                  ? 'translate(0, 8px)' 
+                  : tooltipPosition.colIndex === 6 
+                    ? 'translate(-100%, 8px)' 
+                    : 'translate(-50%, 8px)')
+              : (tooltipPosition.colIndex === 0 
+                  ? 'translate(0, -100%) translateY(-8px)' 
+                  : tooltipPosition.colIndex === 6 
+                    ? 'translate(-100%, -100%) translateY(-8px)' 
+                    : 'translate(-50%, -100%) translateY(-8px)'),
+            zIndex: 100,
+          }}
+          className="w-85 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 pointer-events-none text-left animate-fade-in space-y-3"
+        >
+          <div>
+            <h3 className="text-xs font-black text-slate-800 dark:text-slate-100 flex justify-between items-center">
+              <span>{getTooltipDateTitle(hoveredCell.dateString)}</span>
+              {getThaiLunarDate(hoveredCell.dateString) && (
+                <span className="text-[10px] text-slate-400 font-semibold">{getThaiLunarDate(hoveredCell.dateString)}</span>
+              )}
+            </h3>
+            {getHoliday(hoveredCell.dateString) && (
+              <div className="mt-1.5 px-2 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-900 text-[10px] font-extrabold flex items-center gap-1">
+                <span className="animate-pulse">🎉</span>
+                <span>{locale === 'th' ? getHoliday(hoveredCell.dateString)?.nameTh : getHoliday(hoveredCell.dateString)?.nameEn}</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
+
+          {/* Duty Travel */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>{locale === 'th' ? 'กิจกรรม/ไปราชการ' : 'Duty Travel'}</span>
+            </div>
+            {events.filter(e => e.date === hoveredCell.dateString && e.type === 'duty').length > 0 ? (
+              <div className="space-y-1.5">
+                {events.filter(e => e.date === hoveredCell.dateString && e.type === 'duty').map(event => (
+                  <div key={event.id} className="p-2 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60">
+                    <p className="text-[10px] font-black text-emerald-900 dark:text-emerald-300 leading-normal">{event.title}</p>
+                    <div className="flex items-center gap-1.5 text-[8.5px] text-emerald-700/80 dark:text-emerald-400/80 mt-1 font-bold">
+                      <span>🕒 {event.time}</span>
+                      <span>•</span>
+                      <span className="truncate">👥 {event.participants.join(', ')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[9px] text-slate-400 font-semibold italic pl-2.5">
+                {locale === 'th' ? 'ยังไม่มีกิจกรรมไปราชการในวันนี้' : 'No duty travel logs scheduled'}
+              </p>
+            )}
+          </div>
+
+          {/* Teaching */}
+          <div className="space-y-1.5">
+            <div className="text-[10px] text-violet-600 dark:text-violet-400 font-bold uppercase tracking-wider flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+              <span>{locale === 'th' ? 'การเช็คชื่อสอน' : 'Teaching Schedule'}</span>
+            </div>
+            {events.filter(e => e.date === hoveredCell.dateString && e.type === 'teaching').length > 0 ? (
+              <div className="space-y-1.5">
+                {events.filter(e => e.date === hoveredCell.dateString && e.type === 'teaching').map(event => (
+                  <div key={event.id} className="p-2 rounded-xl bg-violet-50/40 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/60">
+                    <p className="text-[10px] font-black text-violet-900 dark:text-violet-300 leading-normal">{event.title}</p>
+                    <div className="flex items-center gap-1.5 text-[8.5px] text-violet-700/80 dark:text-violet-400/80 mt-1 font-bold">
+                      <span>🕒 {event.time}</span>
+                      <span>•</span>
+                      <span className="truncate">👥 {event.participants.join(', ')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[9px] text-slate-400 font-semibold italic pl-2.5">
+                {locale === 'th' ? 'ยังไม่มีการเช็คชื่อสอนในวันนี้' : 'No teaching schedules logged'}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Daily Schedule Viewer Modal */}
       {isViewerOpen && selectedCell && (
