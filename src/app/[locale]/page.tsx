@@ -559,6 +559,9 @@ export default function HomePage() {
         : 'Are you sure you want to delete this event?'
     );
     if (confirmDelete) {
+      // Find the event to check for Google Drive attachments
+      const eventToDelete = events.find(e => e.id === eventId);
+
       try {
         const { error } = await supabase
           .from('events')
@@ -567,6 +570,24 @@ export default function HomePage() {
 
         if (error) {
           console.error('Failed to delete event from database:', error);
+        } else {
+          // If deleted successfully, check and delete attachment from Google Drive if it is a URL
+          if (eventToDelete && eventToDelete.attachment && eventToDelete.attachment.startsWith('http')) {
+            const fileIdMatch = eventToDelete.attachment.match(/\/d\/([^/]+)/);
+            if (fileIdMatch && fileIdMatch[1]) {
+              const fileId = fileIdMatch[1];
+              // Call DELETE on /api/upload
+              fetch(`/api/upload?fileId=${fileId}`, { method: 'DELETE' })
+                .then(res => {
+                  if (!res.ok) {
+                    console.error('Failed to delete file from Google Drive via API');
+                  } else {
+                    console.log('Successfully deleted file from Google Drive');
+                  }
+                })
+                .catch(err => console.error('Error calling delete API:', err));
+            }
+          }
         }
       } catch (err) {
         console.warn('Database error, removing from local state only:', err);

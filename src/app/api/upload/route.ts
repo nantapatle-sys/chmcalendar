@@ -94,3 +94,53 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const fileId = searchParams.get('fileId');
+
+    if (!fileId) {
+      return NextResponse.json(
+        { error: 'No fileId provided' },
+        { status: 400 }
+      );
+    }
+
+    const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+    if (!clientEmail || !privateKey) {
+      console.error('Missing Google Drive environment variables for deletion');
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+
+    const auth = new google.auth.JWT({
+      email: clientEmail,
+      key: formattedPrivateKey,
+      scopes: ['https://www.googleapis.com/auth/drive']
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    // Delete file from Google Drive
+    await drive.files.delete({
+      fileId: fileId,
+      supportsAllDrives: true
+    });
+
+    return NextResponse.json({ success: true });
+
+  } catch (error: any) {
+    console.error('Google Drive Deletion Error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete file from Google Drive' },
+      { status: 550 }
+    );
+  }
+}

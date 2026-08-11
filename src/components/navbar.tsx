@@ -15,7 +15,8 @@ import {
   LogIn, 
   Send,
   Eye,
-  EyeOff
+  EyeOff,
+  Menu
 } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { supabase } from '@/lib/supabase';
@@ -30,6 +31,7 @@ export function Navbar() {
   const [isAuthOpen, setIsAuthOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<AuthTab>('login');
   const [showPassword, setShowPassword] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   
   // Active User State
   const [currentUser, setCurrentUser] = React.useState<{ name: string; email: string } | null>(null);
@@ -249,8 +251,8 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right Side Actions */}
-          <div className="flex items-center gap-2">
+          {/* Right Side Actions (Desktop) */}
+          <div className="hidden lg:flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
 
@@ -283,7 +285,17 @@ export function Navbar() {
                 <span>{t('login')}</span>
               </button>
             )}
+          </div>
 
+          {/* Mobile Burger Menu Button (Mobile & Tablet) */}
+          <div className="lg:hidden flex items-center">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-850 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 cursor-pointer shadow-sm bg-slate-50/50 dark:bg-slate-900/50"
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5 text-slate-500" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
 
@@ -298,6 +310,68 @@ export function Navbar() {
             {locale === 'th' ? 'ตารางสอน: รัชตะสรณ์ จันทรวรศิษฐ์' : 'Teaching Calendar: Ratchatasorn Jantrawarasit'}
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu Card (Slides down when clicked) */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden py-3.5 border-t border-slate-100 dark:border-slate-850 animate-slide-down space-y-3.5">
+            <div className="flex flex-col gap-3">
+              {/* Language switcher */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-150 dark:border-slate-800/70">
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-350">
+                  {locale === 'th' ? 'เปลี่ยนภาษา (Language)' : 'Switch Language'}
+                </span>
+                <LanguageSwitcher />
+              </div>
+
+              {/* Theme toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-150 dark:border-slate-800/70">
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-350">
+                  {locale === 'th' ? 'สลับธีม สว่าง/มืด' : 'Toggle Theme'}
+                </span>
+                <ThemeToggle />
+              </div>
+
+              {/* Profile / Account details */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-150 dark:border-slate-800/70">
+                {currentUser ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                      <User className="w-4 h-4 text-primary" />
+                      <div className="flex flex-col">
+                        <span>{currentUser.name}</span>
+                        <span className="text-[10px] text-slate-550 font-semibold">{currentUser.email}</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        handleLogout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/20 dark:hover:bg-rose-950/35 dark:text-rose-400 text-xs font-bold border border-rose-200 dark:border-rose-900/40 transition-colors cursor-pointer text-center"
+                    >
+                      {locale === 'th' ? 'ออกจากระบบ' : 'Log Out'}
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setIsAuthOpen(true);
+                      setActiveTab('login');
+                      setIsMobileMenuOpen(false);
+                      setEmail('');
+                      setPassword('');
+                      setMessage('');
+                    }}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>{t('login')}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Authentication Center Modal */}
