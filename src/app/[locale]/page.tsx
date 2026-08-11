@@ -1052,7 +1052,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-1.5 text-[8.5px] text-violet-700/80 dark:text-violet-400/80 mt-1 font-bold">
                       <span>🕒 {event.time}</span>
                       <span>•</span>
-                      <span className="truncate">👥 {event.participants.join(', ')}</span>
+                      <span className="truncate">❌ {locale === 'th' ? 'ผู้ไม่เข้าสอน: ' : 'Absent: '}{event.participants.join(', ')}</span>
                     </div>
                   </div>
                 ))}
@@ -1247,7 +1247,7 @@ export default function HomePage() {
 
                         {/* Participants */}
                         <div className="text-xs text-slate-700 dark:text-slate-300">
-                          <span className="font-bold">{locale === 'th' ? 'ผู้ร่วมกิจกรรม: ' : 'Participants: '}</span>
+                          <span className="font-bold">{locale === 'th' ? 'ผู้ไม่เข้าสอน: ' : 'Absent Teachers: '}</span>
                           <span>{event.participants.join(', ')}</span>
                         </div>
 
@@ -1410,12 +1410,21 @@ export default function HomePage() {
               <div className="space-y-1.5">
                 <label htmlFor="participants-input" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{t('Form.participants')}</span>
+                  <span>
+                    {selectedType === 'teaching'
+                      ? (locale === 'th' ? 'ผู้ไม่เข้าสอน (คั่นด้วยจุลภาค)' : 'Absent Teachers (comma-separated)')
+                      : t('Form.participants')
+                    }
+                  </span>
                 </label>
                 <input
                   id="participants-input"
                   type="text"
-                  placeholder={t('Form.participantsPlaceholder')}
+                  placeholder={
+                    selectedType === 'teaching'
+                      ? (locale === 'th' ? 'ระบุชื่อผู้ไม่เข้าสอน เช่น รัชตะสรณ์ จันทรวรศิษฐ์' : 'Enter absent teachers, e.g. John Doe')
+                      : t('Form.participantsPlaceholder')
+                  }
                   value={participants}
                   onChange={e => setParticipants(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 cursor-text"
