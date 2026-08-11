@@ -220,8 +220,8 @@ export default function HomePage() {
   const t = useTranslations();
   const locale = useLocale();
   
-  // Base date for state tracking (starts at August 10, 2026)
-  const [currentDate, setCurrentDate] = React.useState<Date>(new Date(2026, 7, 10)); 
+  // Base date for state tracking (starts at current date)
+  const [currentDate, setCurrentDate] = React.useState<Date>(new Date()); 
   
   // Active login status states
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
@@ -378,7 +378,7 @@ export default function HomePage() {
   };
 
   const handleGoToToday = () => {
-    setCurrentDate(new Date(2026, 7, 10)); // August 10, 2026
+    setCurrentDate(new Date()); 
   };
 
   // Helper for holidays lookup
@@ -908,7 +908,9 @@ export default function HomePage() {
           <div className="grid grid-cols-7 gap-2 sm:gap-2.5">
             {calendarCells.map((cell, idx) => {
               const dayEvents = events.filter(e => e.date === cell.dateString);
-              const isToday = cell.dayNumber === 10 && cell.isCurrentMonth && month === 7 && year === 2026;
+              const today = new Date();
+              const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+              const isToday = cell.dateString === todayString;
 
               return (
                 <div 
