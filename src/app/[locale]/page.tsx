@@ -1051,7 +1051,7 @@ export default function HomePage() {
                     : 'translate(-50%, -100%) translateY(-8px)'),
             zIndex: 100,
           }}
-          className="w-85 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 pointer-events-none text-left animate-fade-in space-y-3"
+          className="hidden lg:block w-85 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 pointer-events-none text-left animate-fade-in space-y-3"
         >
           <div>
             <h3 className="text-xs font-black text-slate-800 dark:text-slate-100 flex justify-between items-center">
