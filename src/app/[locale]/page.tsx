@@ -454,9 +454,18 @@ export default function HomePage() {
     return `${monthsEn[monthIndex]} ${day}, ${yearAD}`;
   };
 
+  // Helper to determine if an event spans onto a specific date
+  const isEventOnDate = (event: Event, dateStr: string) => {
+    if (event.date === dateStr) return true;
+    if (event.endDate) {
+      return dateStr >= event.date && dateStr <= event.endDate;
+    }
+    return false;
+  };
+
   // Hover Tooltip Handlers
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>, cell: CalendarCell, idx: number) => {
-    const dayEvents = events.filter(ev => ev.date === cell.dateString);
+    const dayEvents = events.filter(ev => isEventOnDate(ev, cell.dateString));
     const holiday = getHoliday(cell.dateString);
     
     if (dayEvents.length === 0 && !holiday) return;
@@ -612,6 +621,34 @@ export default function HomePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!details.trim()) return;
+
+    // Check for duplicates (same type, same title, and overlapping date range)
+    const isDuplicate = events.some(ev => {
+      // Exclude self if editing
+      if (editingEvent && ev.id === editingEvent.id) return false;
+
+      const sameType = ev.type === selectedType;
+      const sameTitle = ev.title.trim().toLowerCase() === details.trim().toLowerCase();
+
+      if (sameType && sameTitle) {
+        // Date range overlap logic
+        const sA = ev.date;
+        const eA = ev.endDate || ev.date;
+        const sB = startDate || '2026-08-10';
+        const eB = endDate || startDate || '2026-08-10';
+
+        return sA <= eB && sB <= eA;
+      }
+      return false;
+    });
+
+    if (isDuplicate) {
+      alert(locale === 'th'
+        ? 'ขออภัย! ตรวจพบกิจกรรมนี้ลงทะเบียนซ้ำกันในช่วงเวลาดังกล่าวเรียบร้อยแล้วในระบบ (ไม่สามารถเพิ่มซ้ำได้)'
+        : 'Sorry, this event has already been registered in the system during the specified date range.'
+      );
+      return;
+    }
 
     if (editingEvent) {
       // Edit existing event
@@ -798,7 +835,7 @@ export default function HomePage() {
   };
 
   // Get active day events for the viewer
-  const selectedCellEvents = selectedCell ? events.filter(e => e.date === selectedCell.dateString) : [];
+  const selectedCellEvents = selectedCell ? events.filter(e => isEventOnDate(e, selectedCell.dateString)) : [];
   const selectedCellDutyEvents = selectedCellEvents.filter(e => e.type === 'duty');
   const selectedCellTeachingEvents = selectedCellEvents.filter(e => e.type === 'teaching');
 
@@ -928,7 +965,7 @@ export default function HomePage() {
           {/* Days Grid */}
           <div className="grid grid-cols-7 gap-2 sm:gap-2.5">
             {calendarCells.map((cell, idx) => {
-              const dayEvents = events.filter(e => e.date === cell.dateString);
+              const dayEvents = events.filter(e => isEventOnDate(e, cell.dateString));
               const today = new Date();
               const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
               const isToday = cell.dateString === todayString;
@@ -1039,9 +1076,9 @@ export default function HomePage() {
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               <span>{locale === 'th' ? 'กิจกรรม/ไปราชการ' : 'Duty Travel'}</span>
             </div>
-            {events.filter(e => e.date === hoveredCell.dateString && e.type === 'duty').length > 0 ? (
+            {events.filter(e => isEventOnDate(e, hoveredCell.dateString) && e.type === 'duty').length > 0 ? (
               <div className="space-y-1.5">
-                {events.filter(e => e.date === hoveredCell.dateString && e.type === 'duty').map(event => (
+                {events.filter(e => isEventOnDate(e, hoveredCell.dateString) && e.type === 'duty').map(event => (
                   <div key={event.id} className="p-2 rounded-xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60">
                     <p className="text-[10px] font-black text-emerald-900 dark:text-emerald-300 leading-normal">{event.title}</p>
                     <div className="flex items-center gap-1.5 text-[8.5px] text-emerald-700/80 dark:text-emerald-400/80 mt-1 font-bold">
@@ -1065,9 +1102,9 @@ export default function HomePage() {
               <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
               <span>{locale === 'th' ? 'การเช็คชื่อสอน' : 'Teaching Schedule'}</span>
             </div>
-            {events.filter(e => e.date === hoveredCell.dateString && e.type === 'teaching').length > 0 ? (
+            {events.filter(e => isEventOnDate(e, hoveredCell.dateString) && e.type === 'teaching').length > 0 ? (
               <div className="space-y-1.5">
-                {events.filter(e => e.date === hoveredCell.dateString && e.type === 'teaching').map(event => (
+                {events.filter(e => isEventOnDate(e, hoveredCell.dateString) && e.type === 'teaching').map(event => (
                   <div key={event.id} className="p-2 rounded-xl bg-violet-50/40 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/60">
                     <p className="text-[10px] font-black text-violet-900 dark:text-violet-300 leading-normal">{event.title}</p>
                     <div className="flex items-center gap-1.5 text-[8.5px] text-violet-700/80 dark:text-violet-400/80 mt-1 font-bold">
