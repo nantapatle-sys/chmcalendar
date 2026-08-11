@@ -347,6 +347,8 @@ export default function HomePage() {
   
   // File Upload State
   const [uploadedFileName, setUploadedFileName] = React.useState('');
+  const [uploadedFileUrl, setUploadedFileUrl] = React.useState('');
+  const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handlePrevMonth = () => {
@@ -374,10 +376,41 @@ export default function HomePage() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFileName(file.name);
+    if (!file) return;
+
+    // Check size (Max 8MB)
+    if (file.size > 8 * 1024 * 1024) {
+      alert(locale === 'th' ? 'ขนาดไฟล์เกิน 8MB' : 'File size exceeds 8MB');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadedFileName(file.name);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await res.json();
+      setUploadedFileUrl(data.url); // Save Google Drive webViewLink
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert(locale === 'th' ? 'อัปโหลดไฟล์ล้มเหลว กรุณาตรวจสอบการตั้งค่าคีย์ Google Drive API' : 'File upload failed. Please verify Google Drive API keys configuration.');
+      setUploadedFileName('');
+      setUploadedFileUrl('');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -400,7 +433,8 @@ export default function HomePage() {
     setParticipants(event.participants.join(', '));
     setDetails(event.title);
     setSelectedStatus(event.status);
-    setUploadedFileName(event.attachment || '');
+    setUploadedFileName(event.attachment ? (event.attachment.startsWith('http') ? (locale === 'th' ? 'เอกสารบน Google Drive' : 'Google Drive Document') : event.attachment) : '');
+    setUploadedFileUrl(event.attachment || '');
     
     setIsViewerOpen(false);
     setIsFormOpen(true);
@@ -438,6 +472,8 @@ export default function HomePage() {
     setStartTime('');
     setEndTime('');
     setUploadedFileName('');
+    setUploadedFileUrl('');
+    setIsUploading(false);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -454,7 +490,7 @@ export default function HomePage() {
         time: (startTime && endTime) ? `${startTime} - ${endTime}` : '09:00 - 12:00',
         participants: participants ? participants.split(',').map(p => p.trim()) : [selectedType === 'duty' ? 'พิชชาภา โหลสกุล' : 'รัชตะสรณ์ จันทรวรศิษฐ์'],
         status: selectedStatus,
-        attachment: uploadedFileName || undefined,
+        attachment: uploadedFileUrl || undefined,
         createdBy: editingEvent.createdBy || 'System'
       };
 
@@ -502,7 +538,7 @@ export default function HomePage() {
         time: (startTime && endTime) ? `${startTime} - ${endTime}` : '09:00 - 12:00',
         participants: participants ? participants.split(',').map(p => p.trim()) : [selectedType === 'duty' ? 'พิชชาภา โหลสกุล' : 'รัชตะสรณ์ จันทรวรศิษฐ์'],
         status: selectedStatus,
-        attachment: uploadedFileName || undefined,
+        attachment: uploadedFileUrl || undefined,
         createdBy: currentUser ? currentUser.name : (selectedType === 'duty' ? 'พิชชาภา โหลสกุล' : 'รัชตะสรณ์ จันทรวรศิษฐ์')
       };
 
@@ -543,6 +579,7 @@ export default function HomePage() {
     setStartTime('');
     setEndTime('');
     setUploadedFileName('');
+    setUploadedFileUrl('');
   };
 
   // Grid calculation helpers
@@ -920,7 +957,14 @@ export default function HomePage() {
                           <div className="text-[10px] text-primary font-bold flex items-center gap-1">
                             <Upload className="w-3 h-3 text-slate-400" />
                             <span>{locale === 'th' ? 'ไฟล์แนบ: ' : 'Attachment: '}</span>
-                            <span className="underline cursor-pointer">{event.attachment}</span>
+                            <a 
+                              href={event.attachment.startsWith('http') ? event.attachment : '#'} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="underline cursor-pointer hover:text-primary/80"
+                            >
+                              {event.attachment.startsWith('http') ? (locale === 'th' ? 'เปิดดูเอกสาร (Google Drive)' : 'Open Document') : event.attachment}
+                            </a>
                           </div>
                         )}
                       </div>
@@ -1224,16 +1268,29 @@ export default function HomePage() {
                   accept=".pdf,.jpg,.jpeg,.png"
                 />
                 <div 
-                  onClick={handleUploadAreaClick}
-                  className="border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary rounded-xl p-5 transition-colors flex flex-col items-center justify-center text-center cursor-pointer bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900"
+                  onClick={isUploading ? undefined : handleUploadAreaClick}
+                  className={`border border-dashed rounded-xl p-5 transition-colors flex flex-col items-center justify-center text-center cursor-pointer bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900
+                    ${isUploading ? 'opacity-60 cursor-not-allowed border-slate-350 dark:border-slate-700' : 'hover:border-primary border-slate-300 dark:border-slate-700'}
+                  `}
                 >
-                  <Upload className="w-7 h-7 text-slate-400 mb-2" />
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
-                    {uploadedFileName ? `${locale === 'th' ? 'เลือกไฟล์แล้ว: ' : 'Selected: '} ${uploadedFileName}` : t('Form.attachmentPlaceholder')}
-                  </p>
-                  <p className="text-[10px] text-slate-550 mt-0.5">
-                    {locale === 'th' ? 'คลิกเพื่อระบุไฟล์ PDF, JPG, PNG (ไม่เกิน 8MB)' : 'Click to select PDF, JPG, PNG (Max 8MB)'}
-                  </p>
+                  {isUploading ? (
+                    <div className="flex flex-col items-center justify-center py-2">
+                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {locale === 'th' ? 'กำลังอัปโหลดไฟล์ไปที่ Google Drive...' : 'Uploading to Google Drive...'}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="w-7 h-7 text-slate-400 mb-2" />
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
+                        {uploadedFileName ? `${locale === 'th' ? 'เลือกไฟล์แล้ว: ' : 'Selected: '} ${uploadedFileName}` : t('Form.attachmentPlaceholder')}
+                      </p>
+                      <p className="text-[10px] text-slate-550 mt-0.5">
+                        {locale === 'th' ? 'คลิกเพื่อระบุไฟล์ PDF, JPG, PNG (ไม่เกิน 8MB)' : 'Click to select PDF, JPG, PNG (Max 8MB)'}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1248,9 +1305,12 @@ export default function HomePage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer shadow-sm"
+                  disabled={isUploading}
+                  className={`px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer shadow-sm
+                    ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
                 >
-                  {editingEvent ? (locale === 'th' ? 'บันทึกการแก้ไข' : 'Save Changes') : t('Form.save')}
+                  {isUploading ? (locale === 'th' ? 'กำลังอัปโหลด...' : 'Uploading...') : (editingEvent ? (locale === 'th' ? 'บันทึกการแก้ไข' : 'Save Changes') : t('Form.save'))}
                 </button>
               </div>
             </form>
