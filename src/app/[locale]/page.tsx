@@ -872,7 +872,7 @@ export default function HomePage() {
                           </div>
 
                           {/* Edit / Delete action buttons for Admin (Role-based Validation / Superadmin bypass) */}
-                          {isLoggedIn && currentUser && (currentUser.email === 'prachkp@gmail.com' || currentUser.email === 'nantapat.le@ssru.ac.th' || event.createdBy === currentUser.name) && (
+                          {isLoggedIn && currentUser && (currentUser.email?.toLowerCase() === 'prachkp@gmail.com' || currentUser.email?.toLowerCase() === 'nantapat.le@ssru.ac.th' || event.createdBy === currentUser.name) && (
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
@@ -956,7 +956,7 @@ export default function HomePage() {
                           </div>
 
                           {/* Edit / Delete action buttons for Admin (Role-based Validation / Superadmin bypass) */}
-                          {isLoggedIn && currentUser && (currentUser.email === 'prachkp@gmail.com' || currentUser.email === 'nantapat.le@ssru.ac.th' || event.createdBy === currentUser.name) && (
+                          {isLoggedIn && currentUser && (currentUser.email?.toLowerCase() === 'prachkp@gmail.com' || currentUser.email?.toLowerCase() === 'nantapat.le@ssru.ac.th' || event.createdBy === currentUser.name) && (
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
