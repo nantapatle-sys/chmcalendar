@@ -919,9 +919,11 @@ export default function HomePage() {
                   onMouseEnter={(e) => handleMouseEnter(e, cell, idx)}
                   onMouseLeave={handleMouseLeave}
                   className={`min-h-[100px] p-2 rounded-xl border transition-all flex flex-col gap-1.5 cursor-pointer relative
-                    ${!cell.isCurrentMonth 
-                      ? 'bg-slate-50/20 dark:bg-slate-900/5 border-slate-100/50 dark:border-slate-800/40 opacity-30' 
-                      : 'bg-white dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                    ${isToday
+                      ? 'bg-primary/5 dark:bg-primary/10 border-primary/50 dark:border-primary/60 shadow-sm ring-1 ring-primary/15'
+                      : !cell.isCurrentMonth 
+                        ? 'bg-slate-50/20 dark:bg-slate-900/5 border-slate-100/50 dark:border-slate-800/40 opacity-30' 
+                        : 'bg-white dark:bg-slate-900/40 border-slate-200 dark:border-slate-700 hover:border-primary/50'
                     }
                   `}
                 >
