@@ -4,6 +4,7 @@ import { routing } from '@/i18n/routing';
 import { notFound } from 'next/navigation';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Navbar } from '@/components/navbar';
+import { Footer } from '@/components/footer';
 import { Prompt, Outfit } from 'next/font/google';
 
 // Load Google Fonts
@@ -55,6 +56,7 @@ export default async function LocaleLayout({
             <main className="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
               {children}
             </main>
+            <Footer />
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>
