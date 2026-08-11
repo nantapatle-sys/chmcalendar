@@ -193,7 +193,7 @@ export function Navbar() {
 
         if (matched) {
           setMessage(locale === 'th' 
-            ? 'พบข้อมูลบัญชีของท่านแล้ว! กรุณาติดต่อผู้ดูแลระบบหลัก (อ.นันทภัทร ที่อีเมล nantapat.le@ssru.ac.th) เพื่อทำการขอรีเซ็ตรหัสผ่านใหม่เข้าสู่ระบบ' 
+            ? 'พบข้อมูลบัญชีของท่านแล้ว! กรุณาติดต่อผู้ดูแลระบบหลัก (อ.นันทพัชร์ ลีลาอัมพรสิน ที่อีเมล nantapat.le@ssru.ac.th) เพื่อทำการขอรีเซ็ตรหัสผ่านใหม่เข้าสู่ระบบ' 
             : 'Account found! Please contact the main administrator (Aj. Nantapat at nantapat.le@ssru.ac.th) to reset your password.'
           );
           // Keep the message visible for a bit longer so they can read and copy the email
