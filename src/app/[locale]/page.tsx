@@ -399,14 +399,17 @@ export default function HomePage() {
       });
 
       if (!res.ok) {
-        throw new Error('Upload failed');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Upload failed');
       }
 
       const data = await res.json();
       setUploadedFileUrl(data.url); // Save Google Drive webViewLink
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error);
-      alert(locale === 'th' ? 'อัปโหลดไฟล์ล้มเหลว กรุณาตรวจสอบการตั้งค่าคีย์ Google Drive API' : 'File upload failed. Please verify Google Drive API keys configuration.');
+      alert(locale === 'th' 
+        ? `อัปโหลดไฟล์ล้มเหลว: ${error.message || 'กรุณาตรวจสอบการตั้งค่าคีย์ Google Drive API'}` 
+        : `File upload failed: ${error.message || 'Please verify Google Drive API keys configuration.'}`);
       setUploadedFileName('');
       setUploadedFileUrl('');
     } finally {
