@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       requestBody: fileMetadata,
       media: media,
       fields: 'id, name, webViewLink',
+      supportsAllDrives: true,
     });
 
     const uploadedFile = response.data;
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
         role: 'reader',
         type: 'anyone',
       },
+      supportsAllDrives: true,
     });
 
     // 8. Return success response with Google Drive webViewLink
