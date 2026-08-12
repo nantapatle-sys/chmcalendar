@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
+// Generate a unique filename: YYYYMMDD_THHMMSS_XXXXXX.ext
+function generateUniqueFilename(originalName: string): string {
+  const ext = originalName.includes('.')
+    ? '.' + originalName.split('.').pop()
+    : '';
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const timePart = `T${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const random = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return `${datePart}_${timePart}_${random}${ext}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -45,9 +59,10 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const stream = Readable.from(buffer);
 
-    // 6. Upload file to Google Drive folder
+    // 6. Upload file to Google Drive folder (using a unique renamed filename)
+    const uniqueFilename = generateUniqueFilename(file.name);
     const fileMetadata = {
-      name: file.name,
+      name: uniqueFilename,
       parents: [folderId],
     };
 
@@ -79,10 +94,11 @@ export async function POST(request: NextRequest) {
       supportsAllDrives: true,
     });
 
-    // 8. Return success response with Google Drive webViewLink
+    // 8. Return success response with Google Drive webViewLink and both names
     return NextResponse.json({
       url: uploadedFile.webViewLink,
-      name: uploadedFile.name,
+      name: uploadedFile.name,        // renamed unique filename
+      originalName: file.name,        // original filename for display
       id: uploadedFile.id
     });
 

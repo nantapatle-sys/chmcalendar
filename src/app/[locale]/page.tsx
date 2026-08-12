@@ -523,6 +523,8 @@ export default function HomePage() {
 
       const data = await res.json();
       setUploadedFileUrl(data.url); // Save Google Drive webViewLink
+      // Show original name to user, but the file is stored with unique name in Drive
+      setUploadedFileName(data.originalName || file.name);
     } catch (error: any) {
       console.error('Upload failed:', error);
       alert(locale === 'th' 
