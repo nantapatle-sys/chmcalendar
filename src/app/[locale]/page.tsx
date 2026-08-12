@@ -30,8 +30,15 @@ interface Event {
   time: string;
   participants: string[];
   status: 'confirmed' | 'pending';
-  attachment?: string;
+  attachment?: string; // JSON string of AttachmentFile[] or legacy single URL
   createdBy?: string; // Tracks which admin created this event
+}
+
+interface AttachmentFile {
+  name: string;     // original display name
+  url: string;      // Google Drive webViewLink
+  id: string;       // Google Drive file ID
+  size: number;     // bytes
 }
 
 interface CalendarCell {
@@ -345,10 +352,10 @@ export default function HomePage() {
   const [participants, setParticipants] = React.useState('');
   const [details, setDetails] = React.useState('');
   
-  // File Upload State
-  const [uploadedFileName, setUploadedFileName] = React.useState('');
-  const [uploadedFileUrl, setUploadedFileUrl] = React.useState('');
+  // File Upload State (multi-file)
+  const [attachedFiles, setAttachedFiles] = React.useState<AttachmentFile[]>([]);
   const [isUploading, setIsUploading] = React.useState(false);
+  const [uploadingFileName, setUploadingFileName] = React.useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Hover Tooltip State
@@ -495,45 +502,84 @@ export default function HomePage() {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    // Check size (Max 8MB)
-    if (file.size > 8 * 1024 * 1024) {
-      alert(locale === 'th' ? 'ขนาดไฟล์เกิน 8MB' : 'File size exceeds 8MB');
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadedFileName(file.name);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Upload failed');
+    for (const file of files) {
+      // Check size (Max 8MB)
+      if (file.size > 8 * 1024 * 1024) {
+        alert(locale === 'th' ? `ไฟล์ "${file.name}" มีขนาดเกิน 8MB` : `File "${file.name}" exceeds 8MB`);
+        continue;
       }
 
-      const data = await res.json();
-      setUploadedFileUrl(data.url); // Save Google Drive webViewLink
-      // Show original name to user, but the file is stored with unique name in Drive
-      setUploadedFileName(data.originalName || file.name);
-    } catch (error: any) {
-      console.error('Upload failed:', error);
-      alert(locale === 'th' 
-        ? `อัปโหลดไฟล์ล้มเหลว: ${error.message || 'กรุณาตรวจสอบการตั้งค่าคีย์ Google Drive API'}` 
-        : `File upload failed: ${error.message || 'Please verify Google Drive API keys configuration.'}`);
-      setUploadedFileName('');
-      setUploadedFileUrl('');
-    } finally {
-      setIsUploading(false);
+      setIsUploading(true);
+      setUploadingFileName(file.name);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Upload failed');
+        }
+
+        const data = await res.json();
+        // Extract Google Drive file ID from URL
+        const fileIdMatch = (data.url as string).match(/\/d\/([^/]+)/);
+        const driveFileId = fileIdMatch ? fileIdMatch[1] : data.id || '';
+
+        setAttachedFiles(prev => [
+          ...prev,
+          {
+            name: data.originalName || file.name,
+            url: data.url,
+            id: driveFileId,
+            size: file.size,
+          }
+        ]);
+      } catch (error: any) {
+        console.error('Upload failed:', error);
+        alert(locale === 'th'
+          ? `อัปโหลดไฟล์ "${file.name}" ล้มเหลว: ${error.message || 'กรุณาตรวจสอบการตั้งค่าคีย์ Google Drive API'}`
+          : `Upload failed for "${file.name}": ${error.message || 'Please verify Google Drive API keys.'}`);
+      }
+    }
+
+    setIsUploading(false);
+    setUploadingFileName('');
+    // Reset input so the same file can be re-selected if needed
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Helper: format bytes to human-readable
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Remove a file from the attachedFiles list (does NOT delete from Drive yet — only on save/delete)
+  const handleRemoveAttachedFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Parse stored attachment JSON string → AttachmentFile[]
+  const parseAttachments = (raw?: string): AttachmentFile[] => {
+    if (!raw) return [];
+    // Legacy: single URL string
+    if (raw.startsWith('http')) {
+      return [{ name: locale === 'th' ? 'เอกสารบน Google Drive' : 'Google Drive Document', url: raw, id: '', size: 0 }];
+    }
+    try {
+      return JSON.parse(raw) as AttachmentFile[];
+    } catch {
+      return [];
     }
   };
 
@@ -556,8 +602,8 @@ export default function HomePage() {
     setParticipants(event.participants.join(', '));
     setDetails(event.title);
     setSelectedStatus(event.status);
-    setUploadedFileName(event.attachment ? (event.attachment.startsWith('http') ? (locale === 'th' ? 'เอกสารบน Google Drive' : 'Google Drive Document') : event.attachment) : '');
-    setUploadedFileUrl(event.attachment || '');
+    // Load existing attachments into state
+    setAttachedFiles(parseAttachments(event.attachment));
     
     setIsViewerOpen(false);
     setIsFormOpen(true);
@@ -582,21 +628,16 @@ export default function HomePage() {
         if (error) {
           console.error('Failed to delete event from database:', error);
         } else {
-          // If deleted successfully, check and delete attachment from Google Drive if it is a URL
-          if (eventToDelete && eventToDelete.attachment && eventToDelete.attachment.startsWith('http')) {
-            const fileIdMatch = eventToDelete.attachment.match(/\/d\/([^/]+)/);
-            if (fileIdMatch && fileIdMatch[1]) {
-              const fileId = fileIdMatch[1];
-              // Call DELETE on /api/upload
-              fetch(`/api/upload?fileId=${fileId}`, { method: 'DELETE' })
-                .then(res => {
-                  if (!res.ok) {
-                    console.error('Failed to delete file from Google Drive via API');
-                  } else {
-                    console.log('Successfully deleted file from Google Drive');
-                  }
-                })
-                .catch(err => console.error('Error calling delete API:', err));
+          // Delete ALL attached files from Google Drive
+          const attachments = parseAttachments(eventToDelete?.attachment);
+          for (const file of attachments) {
+            if (file.id) {
+              fetch(`/api/upload?fileId=${file.id}`, { method: 'DELETE' })
+                .catch(err => console.error('Error deleting file from Drive:', err));
+            } else if (file.url?.startsWith('http')) {
+              // Legacy: extract ID from URL
+              const m = file.url.match(/\/d\/([^/]+)/);
+              if (m?.[1]) fetch(`/api/upload?fileId=${m[1]}`, { method: 'DELETE' }).catch(() => {});
             }
           }
         }
@@ -615,9 +656,9 @@ export default function HomePage() {
     setEndDate('');
     setStartTime('');
     setEndTime('');
-    setUploadedFileName('');
-    setUploadedFileUrl('');
+    setAttachedFiles([]);
     setIsUploading(false);
+    setUploadingFileName('');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -662,7 +703,7 @@ export default function HomePage() {
         time: (startTime && endTime) ? `${startTime} - ${endTime}` : '09:00 - 12:00',
         participants: participants ? participants.split(',').map(p => p.trim()) : [selectedType === 'duty' ? 'พิชชาภา โหลสกุล' : 'รัชตะสรณ์ จันทรวรศิษฐ์'],
         status: selectedStatus,
-        attachment: uploadedFileUrl || undefined,
+        attachment: attachedFiles.length > 0 ? JSON.stringify(attachedFiles) : undefined,
         createdBy: editingEvent.createdBy || 'System'
       };
 
@@ -710,7 +751,7 @@ export default function HomePage() {
         time: (startTime && endTime) ? `${startTime} - ${endTime}` : '09:00 - 12:00',
         participants: participants ? participants.split(',').map(p => p.trim()) : [selectedType === 'duty' ? 'พิชชาภา โหลสกุล' : 'รัชตะสรณ์ จันทรวรศิษฐ์'],
         status: selectedStatus,
-        attachment: uploadedFileUrl || undefined,
+        attachment: attachedFiles.length > 0 ? JSON.stringify(attachedFiles) : undefined,
         createdBy: currentUser ? currentUser.name : (selectedType === 'duty' ? 'พิชชาภา โหลสกุล' : 'รัชตะสรณ์ จันทรวรศิษฐ์')
       };
 
@@ -750,8 +791,8 @@ export default function HomePage() {
     setEndDate('');
     setStartTime('');
     setEndTime('');
-    setUploadedFileName('');
-    setUploadedFileUrl('');
+    setAttachedFiles([]);
+    setUploadingFileName('');
   };
 
   // Grid calculation helpers
@@ -1225,21 +1266,33 @@ export default function HomePage() {
                           {event.title}
                         </div>
 
-                        {/* Attachment Link if any */}
-                        {event.attachment && (
-                          <div className="text-[10px] text-primary font-bold flex items-center gap-1">
-                            <Upload className="w-3 h-3 text-slate-400" />
-                            <span>{locale === 'th' ? 'ไฟล์แนบ: ' : 'Attachment: '}</span>
-                            <a 
-                              href={event.attachment.startsWith('http') ? event.attachment : '#'} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="underline cursor-pointer hover:text-primary/80"
-                            >
-                              {event.attachment.startsWith('http') ? (locale === 'th' ? 'เปิดดูเอกสาร (Google Drive)' : 'Open Document') : event.attachment}
-                            </a>
-                          </div>
-                        )}
+                        {/* Attachments list */}
+                        {(() => {
+                          const files = parseAttachments(event.attachment);
+                          if (files.length === 0) return null;
+                          return (
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1 mb-1">
+                                <Upload className="w-3 h-3" />
+                                <span>{locale === 'th' ? 'ไฟล์แนบ:' : 'Attachments:'}</span>
+                              </div>
+                              {files.map((f, fi) => (
+                                <a
+                                  key={fi}
+                                  href={f.url.startsWith('http') ? f.url : '#'}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 dark:bg-primary/10 border border-primary/20 hover:bg-primary/10 dark:hover:bg-primary/15 transition-colors cursor-pointer group"
+                                >
+                                  <div className="w-5 h-5 rounded-md bg-primary/15 flex items-center justify-center shrink-0">
+                                    <Upload className="w-3 h-3 text-primary" />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-primary group-hover:underline truncate">{f.name}</span>
+                                </a>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -1539,41 +1592,87 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Attachment File Box */}
-              <div className="space-y-1.5">
+              {/* Attachment File Box - Multi-File Upload */}
+              <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">{t('Form.attachment')}</label>
                 <input 
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
                   onChange={handleFileChange} 
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.docx,.doc,.xlsx,.xls"
+                  multiple
                 />
+
+                {/* Drop zone */}
                 <div 
                   onClick={isUploading ? undefined : handleUploadAreaClick}
-                  className={`border border-dashed rounded-xl p-5 transition-colors flex flex-col items-center justify-center text-center cursor-pointer bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900
-                    ${isUploading ? 'opacity-60 cursor-not-allowed border-slate-350 dark:border-slate-700' : 'hover:border-primary border-slate-300 dark:border-slate-700'}
+                  className={`border-2 border-dashed rounded-xl p-4 transition-all flex flex-col items-center justify-center text-center cursor-pointer
+                    ${isUploading
+                      ? 'opacity-60 cursor-not-allowed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30'
+                      : 'border-primary/30 dark:border-primary/40 bg-primary/3 dark:bg-primary/5 hover:border-primary/60 hover:bg-primary/6'
+                    }
                   `}
                 >
                   {isUploading ? (
-                    <div className="flex flex-col items-center justify-center py-2">
-                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {locale === 'th' ? 'กำลังอัปโหลดไฟล์ไปที่ Google Drive...' : 'Uploading to Google Drive...'}
+                    <div className="flex flex-col items-center gap-2 py-1">
+                      <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                        {locale === 'th' ? `กำลังอัปโหลด: ${uploadingFileName}` : `Uploading: ${uploadingFileName}`}
                       </p>
                     </div>
                   ) : (
                     <>
-                      <Upload className="w-7 h-7 text-slate-400 mb-2" />
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
-                        {uploadedFileName ? `${locale === 'th' ? 'เลือกไฟล์แล้ว: ' : 'Selected: '} ${uploadedFileName}` : t('Form.attachmentPlaceholder')}
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
+                        <Upload className="w-5 h-5 text-primary" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                        {locale === 'th' ? 'คลิกเพื่อเลือกไฟล์เอกสาร' : 'Click to select document files'}
                       </p>
-                      <p className="text-[10px] text-slate-550 mt-0.5">
-                        {locale === 'th' ? 'คลิกเพื่อระบุไฟล์ PDF, JPG, PNG (ไม่เกิน 8MB)' : 'Click to select PDF, JPG, PNG (Max 8MB)'}
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {locale === 'th' ? 'PDF, JPG, PNG, DOCX (ไม่เกิน 8MB ต่อไฟล์) — เลือกได้หลายไฟล์' : 'PDF, JPG, PNG, DOCX (Max 8MB each) — multiple files supported'}
                       </p>
                     </>
                   )}
                 </div>
+
+                {/* Attached file cards */}
+                {attachedFiles.length > 0 && (
+                  <div className="space-y-2 max-h-52 overflow-y-auto no-scrollbar">
+                    {attachedFiles.map((file, idx) => {
+                      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                      const iconColor =
+                        ext === 'pdf' ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+                        : ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'bg-sky-100 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400'
+                        : ['doc','docx'].includes(ext) ? 'bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400'
+                        : ['xls','xlsx'].includes(ext) ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500';
+                      const extLabel = ext.toUpperCase() || 'FILE';
+                      return (
+                        <div key={idx} className="flex items-center gap-3 p-2.5 rounded-xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 shadow-sm group">
+                          {/* File type badge */}
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 font-black text-[10px] ${iconColor}`}>
+                            {extLabel}
+                          </div>
+                          {/* File info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{file.name}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">{formatFileSize(file.size)}</p>
+                          </div>
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachedFile(idx)}
+                            className="w-6 h-6 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors cursor-pointer shrink-0"
+                            title={locale === 'th' ? 'ลบไฟล์นี้' : 'Remove file'}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Actions Footer */}
